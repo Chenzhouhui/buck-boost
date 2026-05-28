@@ -1,0 +1,19 @@
+{
+    "C_Cpp.default.compilerPath": "C:\\Users\\chen\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG\\Bin\\armclang.exe",
+    "C_Cpp.default.intelliSenseMode": "clang-arm",
+    "C_Cpp.errorSquiggles": "disabled",
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false,
+    "editor.tokenColorCustomizations": {
+        "comments": "#55aa7f",
+        "keywords": "#ff55ff",
+        "variables": "#a792e2",
+        "strings": "#00ff7f",
+        "functions": "#ffff00",
+        "numbers": "#00eeff",
+        "types": "#55bbff"
+    },
+    "editor.semanticTokenColorCustomizations": null,
+    "workbench.colorTheme": "GitHub Dark"
+}
