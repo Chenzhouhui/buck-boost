@@ -25,7 +25,7 @@
 #define MAX_BOOST_DUTY 19500  // BOOST工作模式下最大占空比65%
 #define MAX_BOOST_DUTY1 28200 // BOOST最大占空比94%
 
-#define CAL_VOUT_K 4099 // 输出电压矫正K值
+#define CAL_VOUT_K 4197 // 输出电压矫正K值
 #define CAL_VOUT_B 1	// 输出电压矫正B值
 #define CAL_IOUT_K 4095 // 输出电流矫正K值
 #define CAL_IOUT_B 1	// 输出电流矫正B值

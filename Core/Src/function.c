@@ -220,8 +220,8 @@ void Encoder(void)
                         {
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 75.0F) / REF_3V3 * ADC_MAX_VALUE;
-                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (6200.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
                     // 选中电流设置时
@@ -272,8 +272,8 @@ void Encoder(void)
                         {
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 75.0F) / REF_3V3 * ADC_MAX_VALUE;
-                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (6200.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
                 }
@@ -451,8 +451,8 @@ void Encoder(void)
                         if (SET_Value.SET_bit == 1)
                         {
                             SET_Value.Vout += 10.0F;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Vout > 48.5)
+                            // 当设置值大于25.5f时限位
+                            if (SET_Value.Vout > 24.5f)
                             {
                                 SET_Value.Vout -= 10.0F;
                             }
@@ -461,18 +461,18 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 2)
                         {
                             SET_Value.Vout += 1;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Vout > 48.5)
+                            // 当设置值大于25.5f时限位
+                            if (SET_Value.Vout > 24.5f)
                             {
-                                SET_Value.Vout = 48.5F;
+                                SET_Value.Vout = 24.5F;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             SET_Value.Vout += 0.1F;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Vout > 48.5)
+                            // 当设置值大于24.5f时限位
+                            if (SET_Value.Vout > 24.5f)
                             {
                                 SET_Value.Vout -= 0.1F;
                             }
@@ -481,8 +481,8 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 4)
                         {
                             SET_Value.Vout += 0.01F;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Vout > 48.5)
+                            // 当设置值大于24.5f时限位
+                            if (SET_Value.Vout > 24.5f)
                             {
                                 SET_Value.Vout -= 0.01F;
                             }
@@ -493,8 +493,8 @@ void Encoder(void)
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
 
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 75.0F) / REF_3V3 * ADC_MAX_VALUE;
-                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (6200.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
                     // 选中电流设置时
@@ -503,29 +503,29 @@ void Encoder(void)
                         // 选中十位时
                         if (SET_Value.SET_bit == 1)
                         {
-                            SET_Value.Iout += 10.0F;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Iout > 10.1)
+                            SET_Value.Iout += 3.0F;
+                            // 当设置值大于10.1时限位
+                            if (SET_Value.Iout > 3.1)
                             {
-                                SET_Value.Iout -= 10.0F;
+                                SET_Value.Iout -= 3.0F;
                             }
                         }
                         // 选中个位时
                         else if (SET_Value.SET_bit == 2)
                         {
                             SET_Value.Iout += 1;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Iout > 10.1)
+                            // 当设置值大于3.1时限位
+                            if (SET_Value.Iout > 3.1)
                             {
-                                SET_Value.Iout = 10.1F;
+                                SET_Value.Iout = 3.1F;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             SET_Value.Iout += 0.1F;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Iout > 10.1)
+                            // 当设置值大于3.1时限位
+                            if (SET_Value.Iout > 3.1)
                             {
                                 SET_Value.Iout -= 0.1F;
                             }
@@ -534,8 +534,8 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 4)
                         {
                             SET_Value.Iout += 0.01F;
-                            // 当设置值大于48.5时限位
-                            if (SET_Value.Iout > 10.1)
+                            // 当设置值大于3.1时限位
+                            if (SET_Value.Iout > 3.1)
                             {
                                 SET_Value.Iout -= 0.01F;
                             }
@@ -546,8 +546,8 @@ void Encoder(void)
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
 
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 75.0F) / REF_3V3 * ADC_MAX_VALUE;
-                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (6200.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
                 }
@@ -609,29 +609,29 @@ void Encoder(void)
                         // 选中十位时
                         if (SET_Value.SET_bit == 1)
                         {
-                            MAX_VOUT_OCP_VAL += 10.0F;
-                            // 当设置值大于10.5时限位
-                            if (MAX_VOUT_OCP_VAL > 10.5)
+                            MAX_VOUT_OCP_VAL += 3.0F;
+                            // 当设置值大于3.1时限位
+                            if (MAX_VOUT_OCP_VAL > 3.1)
                             {
-                                MAX_VOUT_OCP_VAL -= 10;
+                                MAX_VOUT_OCP_VAL -= 3.0F;
                             }
                         }
                         // 选中个位时
                         else if (SET_Value.SET_bit == 2)
                         {
                             MAX_VOUT_OCP_VAL += 1.0F;
-                            // 当设置值大于10.5时限位
-                            if (MAX_VOUT_OCP_VAL > 10.5)
+                            // 当设置值大于3.1时限位
+                            if (MAX_VOUT_OCP_VAL > 3.1)
                             {
-                                MAX_VOUT_OCP_VAL = 10.5;
+                                MAX_VOUT_OCP_VAL = 3.1;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             MAX_VOUT_OCP_VAL += 0.1F;
-                            // 当设置值大于10.5时限位
-                            if (MAX_VOUT_OCP_VAL > 10.5)
+                            // 当设置值大于3.5时限位
+                            if (MAX_VOUT_OCP_VAL > 3.5)
                             {
                                 MAX_VOUT_OCP_VAL -= 0.1;
                             }
@@ -641,7 +641,7 @@ void Encoder(void)
                         {
                             MAX_VOUT_OCP_VAL += 0.01F;
                             // 当设置值大于10.5时限位
-                            if (MAX_VOUT_OCP_VAL > 10.5)
+                            if (MAX_VOUT_OCP_VAL > 3.5)
                             {
                                 MAX_VOUT_OCP_VAL -= 0.01;
                             }
@@ -659,8 +659,8 @@ void Encoder(void)
                         if (SET_Value.SET_bit == 1)
                         {
                             MAX_VOUT_OVP_VAL += 10.0F;
-                            // 当设置值大于50时限位
-                            if (MAX_VOUT_OVP_VAL > 50.0)
+                            // 当设置值大于25时限位
+                            if (MAX_VOUT_OVP_VAL > 25.0)
                             {
                                 MAX_VOUT_OVP_VAL -= 10;
                             }
@@ -669,18 +669,18 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 2)
                         {
                             MAX_VOUT_OVP_VAL += 1.0F;
-                            // 当设置值大于50时限位
-                            if (MAX_VOUT_OVP_VAL > 50.0)
+                            // 当设置值大于25时限位
+                            if (MAX_VOUT_OVP_VAL > 25.0)
                             {
-                                MAX_VOUT_OVP_VAL = 50.0;
+                                MAX_VOUT_OVP_VAL = 25.0;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             MAX_VOUT_OVP_VAL += 0.1F;
-                            // 当设置值大于50时限位
-                            if (MAX_VOUT_OVP_VAL > 50.0)
+                            // 当设置值大于25时限位
+                            if (MAX_VOUT_OVP_VAL > 25.0)
                             {
                                 MAX_VOUT_OVP_VAL -= 0.1;
                             }
@@ -690,7 +690,7 @@ void Encoder(void)
                         {
                             MAX_VOUT_OVP_VAL += 0.01;
                             // 当设置值小于0.5时限位
-                            if (MAX_VOUT_OVP_VAL > 50.0)
+                            if (MAX_VOUT_OVP_VAL > 25.0)
                             {
                                 MAX_VOUT_OVP_VAL -= 0.01;
                             }
@@ -1030,10 +1030,10 @@ CCMRAM void ADCSample(void)
  */
 void ADC_calculate(void)
 {
-    VIN = SADC.VinAvg * REF_3V3 / ADC_MAX_VALUE / (4.7F / 75.0F);   // 计算ADC1通道0输入电压采样结果
-    IIN = SADC.IinAvg * REF_3V3 / ADC_MAX_VALUE / 62.0F / 0.005F;   // 计算ADC1通道1输入电流采样结果
-    VOUT = SADC.VoutAvg * REF_3V3 / ADC_MAX_VALUE / (4.7F / 75.0F); // 计算ADC1通道2输出电压采样结果
-    IOUT = SADC.IoutAvg * REF_3V3 / ADC_MAX_VALUE / 62.0F / 0.005F; // 计算ADC1通道3输出电流采样结果
+    VIN = SADC.VinAvg * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F);   // 计算ADC1通道0输入电压采样结果
+    IIN = SADC.IinAvg * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F;   // 计算ADC1通道1输入电流采样结果
+    VOUT = SADC.VoutAvg * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F); // 计算ADC1通道2输出电压采样结果
+    IOUT = SADC.IoutAvg * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F; // 计算ADC1通道3输出电流采样结果
     MainBoard_TEMP = GET_NTC_Temperature();                         // 获取NTC温度(主板温度)
     CPU_TEMP = GET_CPU_Temperature();                               // 获取单片机CPU温度
 }
@@ -1107,10 +1107,10 @@ void ValInit(void)
     u1 = 0;
     // 设置值初始化
     SET_Value.Vout = 5.0;
-    SET_Value.Iout = 10.0;
+    SET_Value.Iout = 3.0;
     MAX_OTP_VAL = 80.0F;      // 过温保护阈值
-    MAX_VOUT_OVP_VAL = 50.0F; // 输出过压保护阈值
-    MAX_VOUT_OCP_VAL = 10.5F; // 输出过流保护阈值
+    MAX_VOUT_OVP_VAL = 25.0F; // 输出过压保护阈值
+    MAX_VOUT_OCP_VAL = 3.5F; // 输出过流保护阈值
 }
 
 /*
@@ -1200,8 +1200,8 @@ void StateMRise(void)
         u0 = 0;
         u1 = 0;
         // 将设置值传到参考值
-        CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 75.0F) / REF_3V3 * ADC_MAX_VALUE;
-        CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (6200.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
+        CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+        CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
         // 跳转至软启等待状态
         STState = SSWait;
 
@@ -1281,8 +1281,8 @@ void ShortOff(void)
 {
     static int32_t RSCnt = 0;
     static uint8_t RSNum = 0;
-    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (4.7F / 75.0F);
-    float Iout = SADC.Iout * REF_3V3 / ADC_MAX_VALUE / 62.0F / 0.005F;
+    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F);
+    float Iout = SADC.Iout * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F;
     // 当输出电流大于 *A，且电压小于*V时，可判定为发生短路保护
     if ((Iout > MAX_SHORT_I) && (Vout < MIN_SHORT_V))
     {
@@ -1336,8 +1336,8 @@ void OVP(void)
 {
     // 过压保护判据保持计数器定义
     static uint16_t OVPCnt = 0;
-    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (4.7F / 75.0F);
-    // 当输出电压大于50V，且保持10ms
+    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F);
+    // 当输出电压大于25V，且保持10ms
     if (Vout >= MAX_VOUT_OVP_VAL)
     {
         // 条件保持计时
@@ -1375,7 +1375,7 @@ void OCP(void)
     // 保留保护重启计数器
     static uint16_t RSNum = 0;
 
-    float Iout = SADC.Iout * REF_3V3 / ADC_MAX_VALUE / 62.0F / 0.005F;
+    float Iout = SADC.Iout * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F;
 
     // 当输出电流大于*A，且保持50ms
     if ((Iout >= MAX_VOUT_OCP_VAL) && (DF.SMFlag == Run))
@@ -1604,7 +1604,8 @@ float calculateTemperature(float voltage)
     float T0 = 273.15F + 25;                                       // 转换为开尔文温度
     float B = 3950;                                                // B值
     float Ka = 273.15F;                                            // K值
-    Rt = (REF_3V3 - voltage) * 10000.0F / voltage;                 // 计算Rt
+    Rt = (REF_3V3 - voltage) * 10000.0F / voltage;                 // 计算Rt 
+    
     float temperature = 1.0F / (1.0F / T0 + log(Rt / R) / B) - Ka; // 计算温度
     return temperature;
 }
@@ -1771,32 +1772,32 @@ void Auto_FAN(void)
     {
         FAN_PWM_set(0); // 设置风扇转速为0
     }
-    else if (TEMP >= 35)
+    else if (TEMP >= 65)
     {
-        FAN_PWM_set(35); // 设置风扇转速为35%
+        FAN_PWM_set(100); // 设置风扇转速为100%
     }
-    else if (TEMP >= 40)
+    else if (TEMP >= 60)
     {
-        FAN_PWM_set(45);
-    }
-    else if (TEMP >= 45)
-    {
-        FAN_PWM_set(60);
-    }
-    else if (TEMP >= 50)
-    {
-        FAN_PWM_set(70);
+        FAN_PWM_set(90); // 设置风扇转速为90%
     }
     else if (TEMP >= 55)
     {
         FAN_PWM_set(80);
     }
-    else if (TEMP >= 60)
+    else if (TEMP >= 50)
     {
-        FAN_PWM_set(90);
+        FAN_PWM_set(70);
     }
-    else if (TEMP >= 65)
+    else if (TEMP >= 45)
     {
-        FAN_PWM_set(100);
+        FAN_PWM_set(60);
+    }
+    else if (TEMP >= 40)
+    {
+        FAN_PWM_set(50);
+    }
+    else if (TEMP >= 35)
+    {
+        FAN_PWM_set(40);
     }
 }
