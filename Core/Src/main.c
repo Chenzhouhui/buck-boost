@@ -194,7 +194,8 @@ int main(void)
                 powerEfficiency = 0;
             }
 
-            USART1_Printf("%.3f,%.3f,%.3f,%.3f,%.2f,%.2f,%.2f,%d\n", VIN, IIN, VOUT, IOUT, MainBoard_TEMP, CPU_TEMP, powerEfficiency, CVCC_Mode); // 串口发送数据
+            USART1_Printf("%.3f,%.3f,%.3f,%.3f,%.2f,%.2f,%.2f,%d,raw:%u,%u,%u,%u\n", VIN, IIN, VOUT, IOUT, MainBoard_TEMP, CPU_TEMP, powerEfficiency, CVCC_Mode,
+                ADC1_RESULT[0], ADC1_RESULT[1], ADC1_RESULT[2], ADC1_RESULT[3]); // 串口发送数据(含ADC原始值)
         }
 
         if (ms_cnt_2 >= 100) // 判断是否计时到100ms
