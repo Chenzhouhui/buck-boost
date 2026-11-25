@@ -7,6 +7,7 @@
 #include "Key.h"
 #include "hrtim.h"
 #include "W25Q64.h"
+#include "PID.h"
 #include <stdint.h>
 #include <string.h>
 
@@ -20,7 +21,7 @@ volatile uint8_t BUZZER_Flag = 0;                                  // 蜂鸣器�
 volatile float MAX_OTP_VAL;                                        // 过温保护阈值
 volatile float MAX_VOUT_OVP_VAL;                                   // 输出过压保护阈值
 volatile float MAX_VOUT_OCP_VAL;                                   // 输出过流保护阈值
-#define MAX_SHORT_I 10.1F                                          // 短路电流判据
+#define MAX_SHORT_I 6.0F                                           // 短路电流判据（硬件满量程6.6A，需小于量程上限）
 #define MIN_SHORT_V 0.5F                                           // 短路电压判据
 struct _Ctr_value CtrValue = {0, 0, 0, 0, MIN_BUKC_DUTY, 0, 0, 0}; // 控制参数
 struct _FLAG DF = {0, 0, 0, 0, 0, 0, 0};                           // 控制标志位
@@ -31,6 +32,19 @@ _Screen_page Screen_page = VIset_page;                             // 当前屏�
 volatile float VIN, VOUT, IIN, IOUT;                               // 电压电流实际值
 volatile float MainBoard_TEMP, CPU_TEMP;                           // 主板和CPU温度实际值
 volatile float powerEfficiency = 0;                                // 电源转换效率
+
+static volatile uint16_t Short_RSCnt = 0, Short_RSNum = 0, Short_OkCnt = 0; // 短路保护恢复与重试计数器
+static volatile uint16_t OCP_RSCnt = 0, OCP_RSNum = 0, OCP_OkCnt = 0;       // 过流保护恢复与重试计数器
+
+static void Reset_FaultRetryCounters(void)
+{
+    Short_RSCnt = 0;
+    Short_RSNum = 0;
+    Short_OkCnt = 0;
+    OCP_RSCnt = 0;
+    OCP_RSNum = 0;
+    OCP_OkCnt = 0;
+}
 
 extern volatile int32_t VErr0, VErr1, VErr2; // 电压误差
 extern volatile int32_t u0, u1;              // 电压环输出量
@@ -59,7 +73,8 @@ void Key_Process(void)
         BUZZER_Middle_Flag = 1; // 蜂鸣器中等时间长度鸣叫触发标志位置1
         if (DF.SMFlag == Err)   // 如果状态机处于错误状态
         {
-            DF.ErrFlag = F_NOERR; // 消除故障状态
+            DF.ErrFlag = F_NOERR;       // 消除故障状态
+            Reset_FaultRetryCounters(); // 复位短路/过流重试计数
         }
         else if (Screen_page == VIset_page)
         {
@@ -96,7 +111,8 @@ void Key_Process(void)
         // 如果状态机处于错误状态
         if (DF.SMFlag == Err)
         {
-            DF.ErrFlag = F_NOERR; // 消除故障状态
+            DF.ErrFlag = F_NOERR;       // 消除故障状态
+            Reset_FaultRetryCounters(); // 复位短路/过流重试计数
         }
         // 当状态机处于软启动状态或运行状态时
         else if ((DF.SMFlag == Rise) || (DF.SMFlag == Run))
@@ -113,6 +129,7 @@ void Key_Process(void)
         else if (DF.SMFlag == Wait)
         {
             DF.OUTPUT_Flag = 1; // 输出使能
+            STState = SSInit;   // 重置软启动子状态，确保从初始化阶段开始
             DF.SMFlag = Rise;   // 进入软启动状态
         }
         USART1_Printf("按键2按下\r\n"); // 串口发送消息
@@ -124,7 +141,8 @@ void Key_Process(void)
         BUZZER_Middle_Flag = 1; // 蜂鸣器中等时间长度鸣叫触发标志位置1
         if (DF.SMFlag == Err)   // 如果状态机处于错误状态
         {
-            DF.ErrFlag = F_NOERR; // 消除故障状态
+            DF.ErrFlag = F_NOERR;       // 消除故障状态
+            Reset_FaultRetryCounters(); // 复位短路/过流重试计数
         }
         // 当屏幕页面处于电压电流设置页面时
         else if (Screen_page == VIset_page || Screen_page == SET_page)
@@ -220,7 +238,7 @@ void Encoder(void)
                         {
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (1.0F / 11.3F) / REF_3V3 * ADC_MAX_VALUE;
                             CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
@@ -272,7 +290,7 @@ void Encoder(void)
                         {
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (1.0F / 11.3F) / REF_3V3 * ADC_MAX_VALUE;
                             CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
@@ -451,8 +469,8 @@ void Encoder(void)
                         if (SET_Value.SET_bit == 1)
                         {
                             SET_Value.Vout += 10.0F;
-                            // 当设置值大于25.5f时限位
-                            if (SET_Value.Vout > 24.5f)
+                            // 当设置值大于30.5f时限位
+                            if (SET_Value.Vout > 30.5f)
                             {
                                 SET_Value.Vout -= 10.0F;
                             }
@@ -461,18 +479,18 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 2)
                         {
                             SET_Value.Vout += 1;
-                            // 当设置值大于25.5f时限位
-                            if (SET_Value.Vout > 24.5f)
+                            // 当设置值大于30.5f时限位
+                            if (SET_Value.Vout > 30.5f)
                             {
-                                SET_Value.Vout = 24.5F;
+                                SET_Value.Vout = 30.5F;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             SET_Value.Vout += 0.1F;
-                            // 当设置值大于24.5f时限位
-                            if (SET_Value.Vout > 24.5f)
+                            // 当设置值大于30.5f时限位
+                            if (SET_Value.Vout > 30.5f)
                             {
                                 SET_Value.Vout -= 0.1F;
                             }
@@ -481,8 +499,8 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 4)
                         {
                             SET_Value.Vout += 0.01F;
-                            // 当设置值大于24.5f时限位
-                            if (SET_Value.Vout > 24.5f)
+                            // 当设置值大于30.5f时限位
+                            if (SET_Value.Vout > 30.5f)
                             {
                                 SET_Value.Vout -= 0.01F;
                             }
@@ -493,7 +511,7 @@ void Encoder(void)
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
 
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (1.0F / 11.3F) / REF_3V3 * ADC_MAX_VALUE;
                             CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
@@ -503,29 +521,29 @@ void Encoder(void)
                         // 选中十位时
                         if (SET_Value.SET_bit == 1)
                         {
-                            SET_Value.Iout += 3.0F;
-                            // 当设置值大于10.1时限位
-                            if (SET_Value.Iout > 3.1)
+                            SET_Value.Iout += 5.0F;
+                            // 当设置值大于5.1时限位
+                            if (SET_Value.Iout > 5.1)
                             {
-                                SET_Value.Iout -= 3.0F;
+                                SET_Value.Iout -= 5.0F;
                             }
                         }
                         // 选中个位时
                         else if (SET_Value.SET_bit == 2)
                         {
                             SET_Value.Iout += 1;
-                            // 当设置值大于3.1时限位
-                            if (SET_Value.Iout > 3.1)
+                            // 当设置值大于5.1时限位
+                            if (SET_Value.Iout > 5.1)
                             {
-                                SET_Value.Iout = 3.1F;
+                                SET_Value.Iout = 5.1F;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             SET_Value.Iout += 0.1F;
-                            // 当设置值大于3.1时限位
-                            if (SET_Value.Iout > 3.1)
+                            // 当设置值大于5.1时限位
+                            if (SET_Value.Iout > 5.1)
                             {
                                 SET_Value.Iout -= 0.1F;
                             }
@@ -534,8 +552,8 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 4)
                         {
                             SET_Value.Iout += 0.01F;
-                            // 当设置值大于3.1时限位
-                            if (SET_Value.Iout > 3.1)
+                            // 当设置值大于5.1时限位
+                            if (SET_Value.Iout > 5.1)
                             {
                                 SET_Value.Iout -= 0.01F;
                             }
@@ -546,7 +564,7 @@ void Encoder(void)
                             SET_Value.SET_modified_flag = 1; // 设置被修改标志位置1
 
                             // 将设置值传到参考值
-                            CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+                            CtrValue.Vout_SETref = SET_Value.Vout * (1.0F / 11.3F) / REF_3V3 * ADC_MAX_VALUE;
                             CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
                         }
                     }
@@ -609,29 +627,29 @@ void Encoder(void)
                         // 选中十位时
                         if (SET_Value.SET_bit == 1)
                         {
-                            MAX_VOUT_OCP_VAL += 3.0F;
-                            // 当设置值大于3.1时限位
-                            if (MAX_VOUT_OCP_VAL > 3.1)
+                            MAX_VOUT_OCP_VAL += 5.0F;
+                            // 当设置值大于5.1时限位
+                            if (MAX_VOUT_OCP_VAL > 5.5)
                             {
-                                MAX_VOUT_OCP_VAL -= 3.0F;
+                                MAX_VOUT_OCP_VAL -= 5.0F;
                             }
                         }
                         // 选中个位时
                         else if (SET_Value.SET_bit == 2)
                         {
                             MAX_VOUT_OCP_VAL += 1.0F;
-                            // 当设置值大于3.1时限位
-                            if (MAX_VOUT_OCP_VAL > 3.1)
+                            // 当设置值大于5.1时限位
+                            if (MAX_VOUT_OCP_VAL > 5.5)
                             {
-                                MAX_VOUT_OCP_VAL = 3.1;
+                                MAX_VOUT_OCP_VAL = 5.5;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             MAX_VOUT_OCP_VAL += 0.1F;
-                            // 当设置值大于3.5时限位
-                            if (MAX_VOUT_OCP_VAL > 3.5)
+                            // 当设置值大于5.5时限位
+                            if (MAX_VOUT_OCP_VAL > 5.5)
                             {
                                 MAX_VOUT_OCP_VAL -= 0.1;
                             }
@@ -640,8 +658,8 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 4)
                         {
                             MAX_VOUT_OCP_VAL += 0.01F;
-                            // 当设置值大于10.5时限位
-                            if (MAX_VOUT_OCP_VAL > 3.5)
+                            // 当设置值大于5.5时限位
+                            if (MAX_VOUT_OCP_VAL > 5.5)
                             {
                                 MAX_VOUT_OCP_VAL -= 0.01;
                             }
@@ -659,8 +677,8 @@ void Encoder(void)
                         if (SET_Value.SET_bit == 1)
                         {
                             MAX_VOUT_OVP_VAL += 10.0F;
-                            // 当设置值大于25时限位
-                            if (MAX_VOUT_OVP_VAL > 25.0)
+                            // 当设置值大于31时限位
+                            if (MAX_VOUT_OVP_VAL > 31.0)
                             {
                                 MAX_VOUT_OVP_VAL -= 10;
                             }
@@ -669,18 +687,18 @@ void Encoder(void)
                         else if (SET_Value.SET_bit == 2)
                         {
                             MAX_VOUT_OVP_VAL += 1.0F;
-                            // 当设置值大于25时限位
-                            if (MAX_VOUT_OVP_VAL > 25.0)
+                            // 当设置值大于31时限位
+                            if (MAX_VOUT_OVP_VAL > 31.0)
                             {
-                                MAX_VOUT_OVP_VAL = 25.0;
+                                MAX_VOUT_OVP_VAL = 31.0;
                             }
                         }
                         // 选中小数第一位时
                         else if (SET_Value.SET_bit == 3)
                         {
                             MAX_VOUT_OVP_VAL += 0.1F;
-                            // 当设置值大于25时限位
-                            if (MAX_VOUT_OVP_VAL > 25.0)
+                            // 当设置值大于31.0时限位
+                            if (MAX_VOUT_OVP_VAL > 31.0)
                             {
                                 MAX_VOUT_OVP_VAL -= 0.1;
                             }
@@ -690,7 +708,7 @@ void Encoder(void)
                         {
                             MAX_VOUT_OVP_VAL += 0.01;
                             // 当设置值小于0.5时限位
-                            if (MAX_VOUT_OVP_VAL > 25.0)
+                            if (MAX_VOUT_OVP_VAL > 31.0)
                             {
                                 MAX_VOUT_OVP_VAL -= 0.01;
                             }
@@ -1030,9 +1048,9 @@ CCMRAM void ADCSample(void)
  */
 void ADC_calculate(void)
 {
-    VIN = SADC.VinAvg * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F);   // 计算ADC1通道0输入电压采样结果
+    VIN = SADC.VinAvg * REF_3V3 / ADC_MAX_VALUE / (1.0F / 11.3F);   // 计算ADC1通道0输入电压采样结果
     IIN = SADC.IinAvg * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F;   // 计算ADC1通道1输入电流采样结果
-    VOUT = SADC.VoutAvg * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F); // 计算ADC1通道2输出电压采样结果
+    VOUT = SADC.VoutAvg * REF_3V3 / ADC_MAX_VALUE / (1.0F / 11.3F); // 计算ADC1通道2输出电压采样结果
     IOUT = SADC.IoutAvg * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F; // 计算ADC1通道3输出电流采样结果
     MainBoard_TEMP = GET_NTC_Temperature();                         // 获取NTC温度(主板温度)
     CPU_TEMP = GET_CPU_Temperature();                               // 获取单片机CPU温度
@@ -1090,8 +1108,9 @@ void ValInit(void)
     HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 关闭BUCK电路的PWM输出
     HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2); // 关闭BOOST电路的PWM输出
     DF.BBFlag = NA;
-    // 清除故障标志位
+    // 清除故障标志位及重试计数
     DF.ErrFlag = 0;
+    Reset_FaultRetryCounters();
     // 初始化电压参考量
     CtrValue.Vout_ref = 0;
     // 限制占空比
@@ -1100,17 +1119,16 @@ void ValInit(void)
     CtrValue.BoostDuty = MIN_BOOST_DUTY;
     CtrValue.BoostMaxDuty = MIN_BOOST_DUTY;
     // 环路计算变量初始化
-    VErr0 = 0;
-    VErr1 = 0;
-    VErr2 = 0;
-    u0 = 0;
-    u1 = 0;
+    PID_Init();
     // 设置值初始化
     SET_Value.Vout = 5.0;
     SET_Value.Iout = 3.0;
     MAX_OTP_VAL = 80.0F;      // 过温保护阈值
-    MAX_VOUT_OVP_VAL = 25.0F; // 输出过压保护阈值
-    MAX_VOUT_OCP_VAL = 3.5F; // 输出过流保护阈值
+    MAX_VOUT_OVP_VAL = 31.0F; // 输出过压保护阈值
+    MAX_VOUT_OCP_VAL = 5.5F;  // 输出过流保护阈值
+    // 同步参考值
+    CtrValue.Vout_SETref = SET_Value.Vout * (1.0F / 11.3F) / REF_3V3 * ADC_MAX_VALUE;
+    CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
 }
 
 /*
@@ -1190,17 +1208,17 @@ void StateMRise(void)
         DF.PWMENFlag = 0;
         HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 关闭BUCK电路的PWM输出
         HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2); // 关闭BOOST电路的PWM输出
+        // 复位软启动计数器
+        Cnt = 0;
+        BUCKMaxDutyCnt = 0;
+        BoostMaxDutyCnt = 0;
         // 软启中将运行限制占空比启动，从最小占空比开始启动
         CtrValue.BUCKMaxDuty = MIN_BUKC_DUTY;
         CtrValue.BoostMaxDuty = MIN_BOOST_DUTY;
         // 环路计算变量初始化
-        VErr0 = 0;
-        VErr1 = 0;
-        VErr2 = 0;
-        u0 = 0;
-        u1 = 0;
+        PID_Init();
         // 将设置值传到参考值
-        CtrValue.Vout_SETref = SET_Value.Vout * (4.7F / 47.0F) / REF_3V3 * ADC_MAX_VALUE;
+        CtrValue.Vout_SETref = SET_Value.Vout * (1.0F / 11.3F) / REF_3V3 * ADC_MAX_VALUE;
         CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
         // 跳转至软启等待状态
         STState = SSWait;
@@ -1223,11 +1241,7 @@ void StateMRise(void)
             CtrValue.BoostDuty = MIN_BOOST_DUTY;
             CtrValue.BoostMaxDuty = MIN_BOOST_DUTY;
             // 环路计算变量初始化
-            VErr0 = 0;
-            VErr1 = 0;
-            VErr2 = 0;
-            u0 = 0;
-            u1 = 0;
+            PID_Init();
             CtrValue.Vout_SSref = CtrValue.Vout_SETref >> 1; // 输出参考电压从一半开始启动，避免过冲，然后缓慢上升
             STState = SSRun;                                 // 跳转至软启状态
         }
@@ -1239,15 +1253,13 @@ void StateMRise(void)
         if (DF.PWMENFlag == 0) // 正式发波前环路变量清0
         {
             // 环路计算变量初始化
-            VErr0 = 0;
-            VErr1 = 0;
-            VErr2 = 0;
-            u0 = 0;
-            u1 = 0;
-            __HAL_HRTIM_SETCOMPARE(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, HRTIM_COMPAREUNIT_1, 30000); // BUCK电路下管占空比拉满
-            __HAL_HRTIM_SETCOMPARE(&hhrtim1, HRTIM_TIMERINDEX_TIMER_F, HRTIM_COMPAREUNIT_1, 30000); // BOOST电路下管占空比拉满
-            HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2);           // 开启HRTIM的PWM输出
-            HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2);           // 开启HRTIM的PWM输出
+            PID_Init();
+            BUCKMaxDutyCnt = 0;
+            BoostMaxDutyCnt = 0;
+            __HAL_HRTIM_SETCOMPARE(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, HRTIM_COMPAREUNIT_1, PERIOD - MIN_BUKC_DUTY); // BUCK电路最小占空比启动
+            __HAL_HRTIM_SETCOMPARE(&hhrtim1, HRTIM_TIMERINDEX_TIMER_F, HRTIM_COMPAREUNIT_1, MIN_BOOST_DUTY);         // BOOST电路下管最小占空比启动，防止直通
+            HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2);                            // 开启HRTIM的PWM输出
+            HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2);                            // 开启HRTIM的PWM输出
         }
         // 发波标志位置位
         DF.PWMENFlag = 1;
@@ -1265,6 +1277,9 @@ void StateMRise(void)
 
         if ((CtrValue.BUCKMaxDuty == MAX_BUCK_DUTY) && (CtrValue.BoostMaxDuty == MAX_BOOST_DUTY))
         {
+            // 复位软启动计数器
+            BUCKMaxDutyCnt = 0;
+            BoostMaxDutyCnt = 0;
             // 状态机跳转至运行状态
             DF.SMFlag = Run;
             // 软启动子状态跳转至初始化状态
@@ -1279,50 +1294,68 @@ void StateMRise(void)
 
 void ShortOff(void)
 {
-    static int32_t RSCnt = 0;
-    static uint8_t RSNum = 0;
-    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F);
+    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (1.0F / 11.3F);
     float Iout = SADC.Iout * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F;
     // 当输出电流大于 *A，且电压小于*V时，可判定为发生短路保护
     if ((Iout > MAX_SHORT_I) && (Vout < MIN_SHORT_V))
     {
+        Short_OkCnt = 0;
         // 关闭PWM
         DF.PWMENFlag = 0;
-        HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 开启HRTIM的PWM输出
-        HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2); // 开启HRTIM的PWM输出
+        HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 关闭BUCK电路的PWM输出
+        HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2); // 关闭BOOST电路的PWM输出
         // 故障标志位
         setRegBits(DF.ErrFlag, F_SW_SHORT);
         // 跳转至故障状态
         DF.SMFlag = Err;
     }
     // 输出短路保护恢复
-    // 当发生输出短路保护，关机后等待4S后清楚故障信息，进入等待状态等待重启
+    // 当发生输出短路保护，关机后等待2S后清除故障信息，进入等待状态等待重启
     if (getRegBits(DF.ErrFlag, F_SW_SHORT))
     {
-        // 等待故障清楚计数器累加
-        RSCnt++;
-        // 等待2S
-        if (RSCnt > 400)
+        Short_OkCnt = 0;
+        // 等待故障清除计数器累加
+        Short_RSCnt++;
+        // 等待2S (400 * 5ms)
+        if (Short_RSCnt > 400)
         {
             // 计数器清零
-            RSCnt = 0;
+            Short_RSCnt = 0;
             // 短路重启只重启10次，10次后不重启
-            if (RSNum > 10)
+            if (Short_RSNum > 10)
             {
                 // 确保不清除故障，不重启
-                RSNum = 11;
+                Short_RSNum = 11;
                 // 关闭PWM
                 DF.PWMENFlag = 0;
-                HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 开启HRTIM的PWM输出
-                HAL_HRTIM_WaveformOutputStart(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2); // 开启HRTIM的PWM输出
+                HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 关闭BUCK电路的PWM输出
+                HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TF1 | HRTIM_OUTPUT_TF2); // 关闭BOOST电路的PWM输出
             }
             else
             {
                 // 短路重启计数器累加
-                RSNum++;
-                // 清除过流保护故障标志位
+                Short_RSNum++;
+                // 清除短路保护故障标志位
                 clrRegBits(DF.ErrFlag, F_SW_SHORT);
             }
+        }
+    }
+    else
+    {
+        Short_RSCnt = 0;
+        // 正常运行连续稳定5S (1000 * 5ms) 后自动清零历史重试计数
+        if ((DF.SMFlag == Run) && (Short_RSNum > 0))
+        {
+            Short_OkCnt++;
+            if (Short_OkCnt >= 1000)
+            {
+                Short_OkCnt = 0;
+                Short_RSNum = 0;
+            }
+        }
+        else
+        {
+            Short_OkCnt = 0;
         }
     }
 }
@@ -1336,8 +1369,9 @@ void OVP(void)
 {
     // 过压保护判据保持计数器定义
     static uint16_t OVPCnt = 0;
-    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (4.7F / 47.0F);
-    // 当输出电压大于25V，且保持10ms
+    // 过压保护电压采样值
+    float Vout = SADC.Vout * REF_3V3 / ADC_MAX_VALUE / (1.0F / 11.3F);
+    // 当输出电压大于30V，且保持10ms
     if (Vout >= MAX_VOUT_OVP_VAL)
     {
         // 条件保持计时
@@ -1370,10 +1404,6 @@ void OCP(void)
 {
     // 过流保护判据保持计数器定义
     static uint16_t OCPCnt = 0;
-    // 故障清楚保持计数器定义
-    static uint16_t RSCnt = 0;
-    // 保留保护重启计数器
-    static uint16_t RSNum = 0;
 
     float Iout = SADC.Iout * REF_3V3 / ADC_MAX_VALUE / 100.0F / 0.005F;
 
@@ -1387,6 +1417,7 @@ void OCP(void)
         {
             // 计数器清0
             OCPCnt = 0;
+            OCP_OkCnt = 0;
             // 关闭PWM
             DF.PWMENFlag = 0;
             HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 关闭BUCK电路的PWM输出
@@ -1402,23 +1433,24 @@ void OCP(void)
         OCPCnt = 0;
 
     // 输出过流后恢复
-    // 当发生输出软件过流保护，关机后等待4S后清楚故障信息，进入等待状态等待重启
+    // 当发生输出软件过流保护，关机后等待2S后清除故障信息，进入等待状态等待重启
     if (getRegBits(DF.ErrFlag, F_SW_IOUT_OCP))
     {
-        // 等待故障清楚计数器累加
-        RSCnt++;
-        // 等待2S
-        if (RSCnt > 400)
+        OCP_OkCnt = 0;
+        // 等待故障清除计数器累加
+        OCP_RSCnt++;
+        // 等待2S (400 * 5ms)
+        if (OCP_RSCnt > 400)
         {
             // 计数器清零
-            RSCnt = 0;
+            OCP_RSCnt = 0;
             // 过流重启计数器累加
-            RSNum++;
+            OCP_RSNum++;
             // 过流重启只重启10次，10次后不重启（严重故障）
-            if (RSNum > 10)
+            if (OCP_RSNum > 10)
             {
                 // 确保不清除故障，不重启
-                RSNum = 11;
+                OCP_RSNum = 11;
                 // 关闭PWM
                 DF.PWMENFlag = 0;
                 HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 关闭BUCK电路的PWM输出
@@ -1431,6 +1463,24 @@ void OCP(void)
             }
         }
     }
+    else
+    {
+        OCP_RSCnt = 0;
+        // 正常运行连续稳定5S (1000 * 5ms) 后自动清零历史重试计数
+        if ((DF.SMFlag == Run) && (OCP_RSNum > 0))
+        {
+            OCP_OkCnt++;
+            if (OCP_OkCnt >= 1000)
+            {
+                OCP_OkCnt = 0;
+                OCP_RSNum = 0;
+            }
+        }
+        else
+        {
+            OCP_OkCnt = 0;
+        }
+    }
 }
 
 /**
@@ -1440,10 +1490,9 @@ void OCP(void)
  */
 void OTP(void)
 {
-    float TEMP = GET_NTC_Temperature(); // 获取NTC温度值
+    float TEMP = MainBoard_TEMP; // 直接使用主循环ADC2采集的NTC温度，避免中断与主循环竞争ADC2
     if (TEMP >= MAX_OTP_VAL)
     {
-        DF.SMFlag = Wait;
         // 关闭PWM
         DF.PWMENFlag = 0;
         HAL_HRTIM_WaveformOutputStop(&hhrtim1, HRTIM_OUTPUT_TD1 | HRTIM_OUTPUT_TD2); // 关闭BUCK电路的PWM输出
@@ -1598,15 +1647,20 @@ float one_order_lowpass_filter(float input, float alpha)
  */
 float calculateTemperature(float voltage)
 {
+    // 防除零及越界保护，避免返回NaN/Inf
+    if (voltage <= 0.01F || voltage >= (REF_3V3 - 0.01F))
+    {
+        return MainBoard_TEMP;
+    }
     // 数据进入前，可先做滤波处理
-    float Rt = 0;                                                  // NTC电阻
-    float R = 10000;                                               // 10K固定阻值电阻
-    float T0 = 273.15F + 25;                                       // 转换为开尔文温度
-    float B = 3950;                                                // B值
-    float Ka = 273.15F;                                            // K值
-    Rt = (REF_3V3 - voltage) * 10000.0F / voltage;                 // 计算Rt 
-    
-    float temperature = 1.0F / (1.0F / T0 + log(Rt / R) / B) - Ka; // 计算温度
+    float Rt = 0;                                                   // NTC电阻
+    float R = 10000;                                                // 10K固定阻值电阻
+    float T0 = 273.15F + 25;                                        // 转换为开尔文温度
+    float B = 3950;                                                 // B值
+    float Ka = 273.15F;                                             // K值
+    Rt = (REF_3V3 - voltage) * 10000.0F / voltage;                  // 计算Rt
+
+    float temperature = 1.0F / (1.0F / T0 + logf(Rt / R) / B) - Ka; // 计算温度
     return temperature;
 }
 
@@ -1617,7 +1671,10 @@ float calculateTemperature(float voltage)
 float GET_NTC_Temperature(void)
 {
     HAL_ADC_Start(&hadc2); // 启动ADC2采样，采样NTC温度
-    // HAL_ADC_PollForConversion(&hadc2, 100); // 等待ADC采样结束
+    if (HAL_ADC_PollForConversion(&hadc2, 10) != HAL_OK)
+    {
+        return MainBoard_TEMP;
+    }
     uint32_t TEMP_adcValue = HAL_ADC_GetValue(&hadc2);                            // 读取ADC2采样结果
     float temperature = calculateTemperature(TEMP_adcValue * REF_3V3 / 65520.0F); // 计算温度
     return temperature;                                                           // 返回温度值
@@ -1631,7 +1688,10 @@ float GET_NTC_Temperature(void)
 float GET_CPU_Temperature(void)
 {
     HAL_ADC_Start(&hadc5); // 启动ADC5采样，采样单片机CPU温度
-    // HAL_ADC_PollForConversion(&hadc5, 100); // 等待ADC采样结束
+    if (HAL_ADC_PollForConversion(&hadc5, 10) != HAL_OK)
+    {
+        return CPU_TEMP;
+    }
     float Temp_Scale = (float)(TS_CAL2_TEMP - TS_CAL1_TEMP) / (float)(TS_CAL2 - TS_CAL1); // 计算温度比例因子
     // 读取ADC5采样结果, 除以8是因为开启了硬件超采样到15bit，但下面计算用的是12bit，开启硬件超采样是为了得到一个比较平滑的采样结果
     float TEMP_adcValue = HAL_ADC_GetValue(&hadc5) / 8.0F;
@@ -1731,11 +1791,27 @@ void Read_Flash(void)
         OCPtemp[i] = Flash_data[i + 12];
         OVPtemp[i] = Flash_data[i + 16];
     }
-    SET_Value.Vout = bytes_to_float(VSETtemp); // 将字节序列转换为浮点数
-    SET_Value.Iout = bytes_to_float(ISETtemp); // 将字节序列转换为浮点数
-    MAX_OTP_VAL = bytes_to_float(OTPtemp);
-    MAX_VOUT_OCP_VAL = bytes_to_float(OCPtemp);
-    MAX_VOUT_OVP_VAL = bytes_to_float(OVPtemp);
+    float vout = bytes_to_float(VSETtemp); // 将字节序列转换为浮点数
+    float iout = bytes_to_float(ISETtemp); // 将字节序列转换为浮点数
+    float otp = bytes_to_float(OTPtemp);
+    float ocp = bytes_to_float(OCPtemp);
+    float ovp = bytes_to_float(OVPtemp);
+
+    // 校验读取数据合法性，防止异常Flash数据覆盖默认安全值
+    if (vout >= 0.5F && vout <= 30.5F)
+        SET_Value.Vout = vout;
+    if (iout >= 0.01F && iout <= 5.1F)
+        SET_Value.Iout = iout;
+    if (otp >= 40.0F && otp <= 99.99F)
+        MAX_OTP_VAL = otp;
+    if (ocp >= 0.01F && ocp <= 5.5F)
+        MAX_VOUT_OCP_VAL = ocp;
+    if (ovp >= 0.5F && ovp <= 31.0F)
+        MAX_VOUT_OVP_VAL = ovp;
+
+    // 同步参考值
+    CtrValue.Vout_SETref = SET_Value.Vout * (1.0F / 11.3F) / REF_3V3 * ADC_MAX_VALUE;
+    CtrValue.Iout_ref = SET_Value.Iout * 0.005F * (10000.0F / 100.0F) / REF_3V3 * ADC_MAX_VALUE;
 }
 
 /**
@@ -1767,7 +1843,7 @@ float bytes_to_float(uint8_t *bytes)
  */
 void Auto_FAN(void)
 {
-    float TEMP = GET_NTC_Temperature(); // 获取NTC温度值
+    float TEMP = MainBoard_TEMP; // 直接使用ADC_calculate更新的主板温度，避免重复操作ADC2
     if (TEMP < 35)
     {
         FAN_PWM_set(0); // 设置风扇转速为0

@@ -115,22 +115,19 @@ int main(void)
     MX_TIM4_Init();
     MX_SPI3_Init();
     /* USER CODE BEGIN 2 */
-    DF.SMFlag = Init;                         // 初始化状态机
     HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_3); // 启动定时器8和通道3的PWM输出
     FAN_PWM_set(100);                         // 设置风扇转速为100%
     OLED_Init();                              // OLED初始化
     OLED_Clear();                             // 清除OLED屏显示缓冲区
     OLED_ShowChinese(40, 24, "启动中");       // 在屏幕中间显示 启动中
     OLED_Update();                            // 更新OLED显示内容
-    HAL_TIM_Base_Start_IT(&htim2);            // 启动定时器2和定时器中断，1kHz
-    HAL_TIM_Base_Start_IT(&htim3);            // 启动定时器3和定时器中断，200Hz
-    HAL_TIM_Base_Start_IT(&htim4);            // 启动定时器4和定时器中断，100Hz
     Key_Init();                               // 按键状态机初始化
-    PID_Init();                               // PID初始化
-    Init_Flash();                             // Flash初始化
-    Read_Flash();                             // 读取Flash数据
+    ValInit();                                // 先初始化默认参数及关闭PWM，避免与Flash读取竞态
+    Init_Flash();                             // Flash初始化（首次写入默认有效参数）
+    Read_Flash();                             // 读取Flash数据并校验
+    DF.SMFlag = Wait;                         // 初始化完成，直接进入等待状态（避免TIM3再次ValInit覆盖Flash值）
 
-    HAL_Delay(200);                                        // 延时100ms，等待供电稳定
+    HAL_Delay(200);                                        // 延时200ms，等待供电稳定
     HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED); // 校准ADC1
     HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED); // 校准ADC2
     HAL_ADCEx_Calibration_Start(&hadc5, ADC_SINGLE_ENDED); // 校准ADC5
@@ -147,6 +144,10 @@ int main(void)
     HAL_HRTIM_WaveformCountStart(&hhrtim1, HRTIM_TIMERID_TIMER_D);                     // 开启HRTIM波形计数器
     HAL_HRTIM_WaveformCountStart(&hhrtim1, HRTIM_TIMERID_TIMER_F);                     // 开启HRTIM波形计数器
     __HAL_HRTIM_TIMER_ENABLE_IT(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, HRTIM_TIM_IT_REP); // 开启HRTIM定时器D的中断
+
+    HAL_TIM_Base_Start_IT(&htim2);            // 启动定时器2和定时器中断，1kHz
+    HAL_TIM_Base_Start_IT(&htim3);            // 启动定时器3和定时器中断，200Hz
+    HAL_TIM_Base_Start_IT(&htim4);            // 启动定时器4和定时器中断，100Hz
 
     HAL_GPIO_WritePin(GPIOC, LED_G_Pin | LED_R_Pin, GPIO_PIN_RESET); // 关闭LED_G和LED_R
     HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET); // 关闭蜂鸣器
@@ -167,6 +168,7 @@ int main(void)
         if (ms_cnt_3 >= 10) // 判断是否计时到10ms
         {
             ms_cnt_3 = 0;    // 计时清零
+            Key_Process();   // 按键事件处理（放在主循环，避免中断内调用USART1_Printf重入）
             BUZZER_Short();  // 蜂鸣器短促鸣叫
             ADC_calculate(); // ADC采样结果计算
         }
@@ -300,7 +302,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
         KEY_Scan(1, KEY1);        // 按键1扫描
         KEY_Scan(2, KEY2);        // 按键2扫描
         KEY_Scan(3, Encoder_KEY); // 编码器按键扫描
-        Key_Process();            // 按键按下的处理
     }
 }
 

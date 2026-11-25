@@ -10,7 +10,7 @@
 #define KEY2 HAL_GPIO_ReadPin(KEY2_GPIO_Port, KEY2_Pin)
 
 extern uint8_t KEY_Status[KEY_NUM + 1][3]; // 记录各按键状态，按键数量+1跳过0号直观一点
-extern uint8_t Key_Flag[KEY_NUM + 1];      // 按键标志位，记录各按键是否稳定按下，1表示按键已按下，0表示按键没被按下，按键数量+1跳过0号直观一点
+extern volatile uint8_t Key_Flag[KEY_NUM + 1]; // 按键标志位，记录各按键是否稳定按下，1表示按键已按下，0表示按键没被按下，按键数量+1跳过0号直观一点
 
 void Key_Init(void);
 void KEY_Scan(uint8_t key_num, uint8_t KEY);

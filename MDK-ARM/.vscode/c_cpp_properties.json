@@ -3,19 +3,19 @@
         {
             "name": "Buck-Boost",
             "includePath": [
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Core\\Inc",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Drivers\\STM32G4xx_HAL_Driver\\Inc",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Drivers\\STM32G4xx_HAL_Driver\\Inc\\Legacy",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Drivers\\CMSIS\\Device\\ST\\STM32G4xx\\Include",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Drivers\\CMSIS\\Include",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Core\\Hardware",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Core\\Inc",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Drivers\\STM32G4xx_HAL_Driver\\Inc",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Drivers\\STM32G4xx_HAL_Driver\\Inc\\Legacy",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Drivers\\CMSIS\\Device\\ST\\STM32G4xx\\Include",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Drivers\\CMSIS\\Include",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Core\\Hardware",
                 "C:\\Users\\chen\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG\\include",
                 "C:\\Users\\chen\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG\\include\\arm_linux",
                 "C:\\Users\\chen\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG\\include\\arm_linux_compat",
                 "C:\\Users\\chen\\AppData\\Local\\Keil_v5\\ARM\\ARMCLANG\\include\\libcxx",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\MDK-ARM",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Core\\Src",
-                "c:\\Users\\chen\\Desktop\\电源\\buck-boost\\Drivers\\STM32G4xx_HAL_Driver\\Src"
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\MDK-ARM",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Core\\Src",
+                "c:\\Users\\chen\\Desktop\\硬件\\四开关buck-boost\\buck-boost2.0\\Drivers\\STM32G4xx_HAL_Driver\\Src"
             ],
             "defines": [
                 "USE_HAL_DRIVER",

@@ -267,8 +267,20 @@ int USART1_Printf(const char *format, ...)
     rv = vsnprintf((char *)SendBuff, sizeof(SendBuff), (char *)format, arg);
     va_end(arg);
 
-    usart_dma_tx_over = 0;                                   // 清0全局标志，发送完成后重新置1
-    HAL_UART_Transmit_DMA(&huart1, (uint8_t *)SendBuff, rv); // 使用DMA发送数据
+    if (rv <= 0)
+    {
+        return 0;
+    }
+    if (rv >= (int)sizeof(SendBuff))
+    {
+        rv = sizeof(SendBuff) - 1;
+    }
+
+    usart_dma_tx_over = 0; // 清0全局标志，发送完成后重新置1
+    if (HAL_UART_Transmit_DMA(&huart1, (uint8_t *)SendBuff, (uint16_t)rv) != HAL_OK)
+    {
+        usart_dma_tx_over = 1; // 发送未启动时恢复标志，防止死等
+    }
 
     return rv;
 }

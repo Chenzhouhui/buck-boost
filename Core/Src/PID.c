@@ -12,6 +12,7 @@
 extern volatile uint16_t ADC1_RESULT[4];          // ADC1通道1~4采样结果
 volatile int32_t VErr0 = 0, VErr1 = 0, VErr2 = 0; // 电压误差
 volatile int32_t IErr0 = 0, IErr1 = 0;            // 电流误差
+volatile int32_t I_Integral = 0;                  // 电流环路积分量
 volatile int32_t u0 = 0, u1 = 0;                  // 电压环输出量
 volatile int32_t i0 = 0, i1 = 0;                  // 电流环输出量
 volatile _CVCC_Mode CVCC_Mode = CV;               // 恒流恒压模式标志位
@@ -24,7 +25,10 @@ void PID_Init(void)
     u0 = 0;
     u1 = 0;
     i0 = 0;
+    i1 = 0;
     IErr0 = 0;
+    IErr1 = 0;
+    I_Integral = 0;
 }
 
 // 环路的参数buck输出-恒压-PID型补偿器
@@ -47,7 +51,7 @@ void PID_Init(void)
  */
 CCMRAM void BuckBoostVILoopCtlPID(void)
 {
-    static int32_t I_Integral = 0; // 电流环路积分量
+    int32_t u_min, u_max;
 
     CtrValue.Vout_ref = CtrValue.Vout_SETref; // 输出参考电压设置为设置电压
 
@@ -58,12 +62,16 @@ CCMRAM void BuckBoostVILoopCtlPID(void)
     IErr0 = CtrValue.Iout_ref - IoutTemp;
     // 电流环路输出= 积分量 + KP*误差量 + KD*当前误差减上次误差
     i0 = I_Integral + IErr0 * ILOOP_KP + (IErr0 - IErr1) * ILOOP_KD;
+    // 更新电流环上次误差
+    IErr1 = IErr0;
     // 积分量=积分量+KI*误差量
     I_Integral = I_Integral + IErr0 * ILOOP_KI;
 
-    // 积分量限制，积分量最大值限制
-    if (I_Integral > ADC_MAX_VALUE)
-        I_Integral = ADC_MAX_VALUE;
+    // 积分量上下限限制，防止正向或负向积分饱和
+    if (I_Integral > (int32_t)ADC_MAX_VALUE)
+        I_Integral = (int32_t)ADC_MAX_VALUE;
+    else if (I_Integral < -(int32_t)ADC_MAX_VALUE)
+        I_Integral = -(int32_t)ADC_MAX_VALUE;
 
     if (DF.SMFlag == Rise && (VoutTemp < (CtrValue.Vout_ref / 2))) // 判断是否在软启动状态
     {
@@ -126,7 +134,15 @@ CCMRAM void BuckBoostVILoopCtlPID(void)
     case Buck: // BUCK模式
     {
         u0 = u1 + VErr0 * BUCKPIDb0 + VErr1 * BUCKPIDb1 + VErr2 * BUCKPIDb2; // 计算电压环输出
-        // 历史数据幅值
+        // 电压环抗积分饱和限幅
+        u_min = ((int32_t)MIN_BUKC_DUTY << 8) / 3;
+        u_max = ((int32_t)CtrValue.BUCKMaxDuty << 8) / 3 + 256;
+        if (u0 > u_max)
+            u0 = u_max;
+        else if (u0 < u_min)
+            u0 = u_min;
+
+        // 历史数据赋值
         VErr2 = VErr1;
         VErr1 = VErr0;
         u1 = u0;
@@ -146,7 +162,15 @@ CCMRAM void BuckBoostVILoopCtlPID(void)
     {
         // 调用PID环路计算公式（参照PID环路计算文档）
         u0 = u1 + VErr0 * BOOSTPIDb0 + VErr1 * BOOSTPIDb1 + VErr2 * BOOSTPIDb2;
-        // 历史数据幅值
+        // 电压环抗积分饱和限幅
+        u_min = ((int32_t)MIN_BOOST_DUTY << 8) / 3;
+        u_max = ((int32_t)CtrValue.BoostMaxDuty << 8) / 3 + 256;
+        if (u0 > u_max)
+            u0 = u_max;
+        else if (u0 < u_min)
+            u0 = u_min;
+
+        // 历史数据赋值
         VErr2 = VErr1;
         VErr1 = VErr0;
         u1 = u0;
@@ -166,11 +190,18 @@ CCMRAM void BuckBoostVILoopCtlPID(void)
     {
         // 调用PID环路计算公式
         u0 = u1 + VErr0 * BOOSTPIDb0 + VErr1 * BOOSTPIDb1 + VErr2 * BOOSTPIDb2;
-        // 历史数据幅值
+        // 电压环抗积分饱和限幅
+        u_min = ((int32_t)MIN_BOOST_DUTY << 8) / 3;
+        u_max = ((int32_t)CtrValue.BoostMaxDuty << 8) / 3 + 256;
+        if (u0 > u_max)
+            u0 = u_max;
+        else if (u0 < u_min)
+            u0 = u_min;
+
+        // 历史数据赋值
         VErr2 = VErr1;
         VErr1 = VErr0;
         u1 = u0;
-        IErr1 = IErr0;
 
         // 环路输出赋值
         CtrValue.BuckDuty = MAX_BUCK_DUTY1; // BUCK上管固定占空比80%
